@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useGameStore } from '../../store/gameStore';
 import { socketService } from '../../services/socketService';
-import { Button } from '../ui/Button';
 import { ChatPanel } from '../game/ChatPanel';
 import { BotDifficulty } from '../../types';
 import { DEFAULT_AVATARS } from '../../utils/constants';
@@ -13,7 +12,6 @@ export const RoomSetup: React.FC = () => {
   const { currentRoom, playerInfo, gameState } = useGameStore();
   const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>(BotDifficulty.Medium);
   const [copied, setCopied] = useState(false);
-  const [showChat, setShowChat] = useState(false);
 
   // If game started, navigate to game
   React.useEffect(() => {
@@ -23,7 +21,6 @@ export const RoomSetup: React.FC = () => {
   }, [gameState, currentRoom, navigate]);
 
   if (gameState && currentRoom) return null;
-
   if (!currentRoom || !playerInfo) return null;
 
   const localPlayer = currentRoom.players?.find(p => p.name === playerInfo.name);
@@ -59,7 +56,7 @@ export const RoomSetup: React.FC = () => {
       if (def) {
         return (
           <div
-            className="w-full h-full rounded-full flex items-center justify-center text-white font-bold"
+            className="w-full h-full rounded-full flex items-center justify-center text-white font-bold text-xl shadow-inner border-2 border-white/20"
             style={{ background: def.color }}
           >
             {name.charAt(0).toUpperCase()}
@@ -68,247 +65,247 @@ export const RoomSetup: React.FC = () => {
       }
     }
     return (
-      <img src={avatarUrl} alt={name} className="w-full h-full rounded-full object-cover" />
+      <img src={avatarUrl} alt={name} className="w-full h-full rounded-full object-cover shadow-inner border-2 border-white/20" />
     );
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-8 flex flex-col items-center">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-4xl flex items-center justify-between mb-8"
-      >
-        <Button variant="ghost" size="sm" onClick={handleLeave}>
-          ← Leave Room
-        </Button>
-        <h2 className="text-xl font-bold text-white">{currentRoom.name}</h2>
-        <Button variant="ghost" size="sm" onClick={() => setShowChat(!showChat)}>
-          💬 Chat
-        </Button>
-      </motion.div>
+    <div 
+      className="min-h-screen w-full flex flex-col font-sans"
+      style={{
+        backgroundColor: '#1a1a1a',
+        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.03) 1px, rgba(255,255,255,0.03) 2px)'
+      }}
+    >
+      {/* Top Nav */}
+      <div className="flex justify-end items-center w-full px-6 py-4 gap-3">
+        <button 
+          onClick={handleLeave} 
+          className="px-4 py-1.5 rounded-full border-2 border-white/80 bg-black/50 text-white font-medium hover:bg-white hover:text-black transition-colors text-sm flex items-center gap-2 shadow-lg"
+        >
+          Leave Room
+        </button>
+        <button className="px-4 py-1.5 rounded-full border-2 border-white/80 bg-black/50 text-white font-medium hover:bg-white hover:text-black transition-colors text-sm flex items-center gap-2 shadow-lg">
+          <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">New</span> News
+        </button>
+        <button className="px-4 py-1.5 rounded-full border-2 border-white/80 bg-black/50 text-white font-medium hover:bg-white hover:text-black transition-colors text-sm flex items-center gap-2 shadow-lg">
+          🔖 Rules
+        </button>
+        <button className="px-4 py-1.5 rounded-full border-2 border-white/80 bg-black/50 text-white font-medium hover:bg-white hover:text-black transition-colors text-sm flex items-center gap-2 shadow-lg">
+          ⚙️ Settings
+        </button>
+      </div>
 
-      <div className="w-full max-w-4xl flex flex-col lg:flex-row gap-6">
-        {/* Main Content */}
-        <div className="flex-1">
-          {/* Invite Code */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="glass-subtle p-4 mb-6 flex items-center justify-between"
+      {/* Title */}
+      <div className="flex items-center justify-center gap-3 mb-6 mt-2">
+        <span className="text-white font-black text-2xl tracking-wide">{currentRoom.name}</span>
+        <span className="text-white/60">👁️</span>
+        <button className="px-4 py-1 rounded-full border border-white/40 text-white text-sm hover:bg-white/10 bg-black/40 transition-colors">
+          Join Spectators
+        </button>
+      </div>
+
+      {/* Main Grid */}
+      <div className="flex-1 flex flex-col xl:flex-row items-stretch justify-center gap-6 w-full max-w-[1500px] mx-auto px-6 pb-12">
+        
+        {/* LEFT PANEL: THE COURT (Blue) */}
+        <div className="w-full xl:w-[320px] shrink-0 flex flex-col gap-3">
+          <div className="bg-gradient-to-b from-[#3a3a3a] to-[#222222] rounded-full border-2 border-[#555] py-2 text-center font-bold text-white shadow-xl tracking-wider text-sm">
+            THE COURT
+          </div>
+          
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex-1 bg-gradient-to-b from-[#3eb1ff] to-[#0b64e1] rounded-3xl border-4 border-white/95 p-3 shadow-2xl flex flex-col relative overflow-hidden"
           >
-            <div>
-              <p className="text-xs text-slate-400 mb-1">Invite Code</p>
-              <p className="text-2xl font-mono font-bold tracking-widest text-purple-300">
-                {currentRoom.inviteCode}
-              </p>
+            <div className="absolute inset-0 bg-black/5 pointer-events-none"></div>
+            <div className="bg-[#1281fb]/50 rounded-t-2xl border border-white/20 text-center py-1.5 font-bold text-white text-sm mb-4 uppercase tracking-wider shadow-inner">
+              Players
             </div>
-            <Button variant="ghost" size="sm" onClick={handleCopyCode}>
-              {copied ? '✓ Copied!' : '📋 Copy'}
-            </Button>
-          </motion.div>
-
-          {/* Players Circle */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="glass p-8 mb-6"
-          >
-            <h3 className="text-sm font-medium text-slate-400 mb-6 text-center">
-              Players ({currentRoom.players?.length ?? 0}/{currentRoom.maxPlayers})
-            </h3>
-
-            <div className="flex flex-wrap justify-center gap-6">
+            
+            <div className="flex flex-wrap justify-center gap-4 relative z-10 px-2">
               {(currentRoom.players || []).map((player, i) => (
-                <motion.div
-                  key={player.id}
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                <motion.div 
+                  key={player.id} 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
                   transition={{ delay: 0.1 * i, type: 'spring' }}
-                  className="flex flex-col items-center gap-2"
+                  className="flex flex-col items-center gap-1 group relative"
                 >
-                  <div
-                    className={`w-16 h-16 rounded-full overflow-hidden border-2 ${
-                      player.id === currentRoom.hostId
-                        ? 'border-gold-400 ring-2 ring-yellow-400/30'
-                        : 'border-purple-500/30'
-                    }`}
-                    style={
-                      player.id === currentRoom.hostId
-                        ? { borderColor: '#fbbf24' }
-                        : {}
-                    }
-                  >
+                  <div className="w-20 h-20 rounded-full border-4 border-white/90 shadow-[0_4px_10px_rgba(0,0,0,0.3)] bg-[#0b64e1] flex items-center justify-center overflow-hidden">
                     {getAvatarDisplay(player.avatarUrl, player.name)}
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-white">
+                  
+                  {/* Name Pill */}
+                  <div className="bg-[#0b48a3] border-2 border-white/80 rounded-full px-3 py-0.5 shadow-md -mt-3 z-10 relative">
+                    <span className="text-white font-bold text-sm truncate max-w-[80px] block text-center">
                       {player.name}
-                    </p>
-                    <div className="flex items-center gap-1 justify-center">
-                      {player.id === currentRoom.hostId && (
-                        <span className="text-xs text-yellow-400">👑 Host</span>
-                      )}
-                      {player.isBot && (
-                        <span className="text-xs text-blue-400">🤖 Bot</span>
-                      )}
-                    </div>
+                    </span>
                   </div>
+
+                  {player.id === currentRoom.hostId && (
+                    <span className="absolute -top-2 -left-2 text-xl drop-shadow-md z-20" title="Host">👑</span>
+                  )}
+                  
+                  {/* Remove bot button for host */}
                   {isHost && player.isBot && (
-                    <button
+                    <button 
                       onClick={() => handleRemoveBot(player.id)}
-                      className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                      className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full font-bold text-xs border-2 border-white shadow-md hover:bg-red-600 z-20"
+                      title="Remove Bot"
                     >
-                      Remove
+                      ×
                     </button>
                   )}
                 </motion.div>
               ))}
-
-              {/* Empty slots */}
-              {Array.from({
-                length: currentRoom.maxPlayers - (currentRoom.players?.length ?? 0),
-              }).map((_, i) => (
-                <div key={`empty-${i}`} className="flex flex-col items-center gap-2">
-                  <div className="w-16 h-16 rounded-full border-2 border-dashed border-white/10 flex items-center justify-center">
-                    <span className="text-slate-600 text-2xl">+</span>
-                  </div>
-                  <p className="text-sm text-slate-600">Waiting...</p>
-                </div>
-              ))}
             </div>
-          </motion.div>
 
-          {/* Host Controls */}
-          {isHost && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="space-y-4"
-            >
-              {/* Add Bot */}
-              {(currentRoom.players?.length ?? 0) < currentRoom.maxPlayers && (
-                <div className="glass-subtle p-4 flex items-center gap-3">
-                  <select
-                    value={botDifficulty}
-                    onChange={(e) =>
-                      setBotDifficulty(e.target.value as BotDifficulty)
-                    }
-                    className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white
-                               focus:outline-none appearance-none flex-1"
-                  >
-                    {Object.values(BotDifficulty).map((d) => (
-                      <option key={d} value={d} className="bg-slate-800">
-                        🤖 {d} Bot
-                      </option>
-                    ))}
-                  </select>
-                  <Button variant="secondary" size="sm" onClick={handleAddBot}>
-                    Add Bot
-                  </Button>
-                </div>
-              )}
-
-              {/* Start Game */}
-              <Button
-                variant="primary"
-                size="lg"
-                className={`w-full ${canStart ? 'animate-pulse-glow' : ''}`}
-                disabled={!canStart}
-                onClick={handleStart}
+            {/* Empty slots remaining */}
+            <div className="mt-4 text-center relative z-10">
+               <p className="text-white/70 font-medium text-sm">
+                 {currentRoom.maxPlayers - (currentRoom.players?.length ?? 0)} slots remaining
+               </p>
+            </div>
+            
+            {/* Join Team Button (Just visual match to screenshot) */}
+            <div className="mt-auto pt-6 pb-2 relative z-10">
+              <button 
+                className="w-full py-3 rounded-full border-2 border-white/40 bg-white/10 hover:bg-white/20 text-white font-bold tracking-widest uppercase transition-all shadow-inner text-sm"
               >
-                {canStart ? '🎮 Start Game' : `Need ${2 - (currentRoom.players?.length ?? 0)} more players`}
-              </Button>
-            </motion.div>
-          )}
-
-          {!isHost && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="glass-subtle p-6 text-center"
-            >
-              <p className="text-slate-300">
-                Waiting for the host to start the game...
-              </p>
-              <div className="flex justify-center mt-3">
-                <div className="flex gap-1">
-                  {[0, 1, 2].map((i) => (
-                    <motion.div
-                      key={i}
-                      className="w-2 h-2 rounded-full bg-purple-400"
-                      animate={{ opacity: [0.3, 1, 0.3] }}
-                      transition={{
-                        duration: 1.2,
-                        repeat: Infinity,
-                        delay: i * 0.3,
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Room Settings */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="mt-4 glass-subtle p-4"
-          >
-            <h4 className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">
-              Room Settings
-            </h4>
-            <div className="flex flex-wrap gap-3 text-sm text-slate-400">
-              <span>👥 Max {currentRoom.maxPlayers} players</span>
-              <span>⏱️ {currentRoom.settings?.turnTimer ?? 30}s timer</span>
-              <span>
-                {currentRoom.isPrivate ? '🔒 Private' : '🌐 Public'}
-              </span>
+                Waiting For Players
+              </button>
             </div>
           </motion.div>
-
-          {/* Spectators */}
-          {(currentRoom.spectators?.length ?? 0) > 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-4 glass-subtle p-4"
-            >
-              <h4 className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">
-                Spectators ({currentRoom.spectators?.length ?? 0})
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {(currentRoom.spectators || []).map((spec) => (
-                  <span
-                    key={spec.id}
-                    className="text-sm text-slate-400 bg-white/5 px-2 py-1 rounded-lg"
-                  >
-                    👁️ {spec.name}
-                  </span>
-                ))}
-              </div>
-            </motion.div>
-          )}
         </div>
 
-        {/* Chat Sidebar */}
-        {showChat && (
-          <motion.div
+        {/* CENTER PANEL: GAME SETTINGS (Dark Gray) */}
+        <div className="flex-1 min-w-[320px] max-w-[850px] bg-[#3a3a3a] rounded-[32px] border-[5px] border-[#222] shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-8 flex flex-col items-center relative overflow-hidden">
+          
+          <h2 className="text-white font-bold text-xl mb-8 relative z-10 tracking-widest uppercase">GAME SETTINGS</h2>
+          
+          <div className="w-full max-w-[650px] space-y-5 relative z-10">
+            
+            {/* Invite Code Row */}
+            <div className="w-full flex h-16 shadow-[0_4px_10px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden">
+              <div className="bg-[#d2b694] w-28 flex flex-col items-center justify-center font-black text-[#4a3b2b] text-[10px] tracking-widest border-r border-black/20">
+                <span>INVITE</span>
+                <span>CODE</span>
+              </div>
+              <div className="flex-1 bg-black/40 p-4 flex items-center justify-between">
+                <span className="text-2xl font-mono text-white font-bold tracking-widest">{currentRoom.inviteCode}</span>
+                <button 
+                  onClick={handleCopyCode} 
+                  className="text-sm font-bold text-white/80 hover:text-white px-4 py-1.5 rounded bg-white/10 hover:bg-white/20 transition-colors uppercase"
+                >
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+
+            {/* Bots Row */}
+            <div className="w-full flex h-20 shadow-[0_4px_10px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden bg-black/40 items-center justify-between p-5 border border-white/5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full border-2 border-[#555] flex items-center justify-center text-2xl bg-[#333]">🤖</div>
+                <div>
+                  <div className="font-bold text-white tracking-widest">AI BOTS</div>
+                  <div className="text-xs text-white/50 uppercase mt-0.5">Fill empty slots with bots</div>
+                </div>
+              </div>
+              {isHost ? (
+                <div className="flex items-center gap-3">
+                  <select 
+                    value={botDifficulty} 
+                    onChange={(e) => setBotDifficulty(e.target.value as BotDifficulty)} 
+                    className="bg-black/60 text-white font-medium rounded-lg px-3 py-2 outline-none border border-white/10 hover:border-white/30 transition-colors cursor-pointer"
+                  >
+                    {Object.values(BotDifficulty).map((d) => (
+                      <option key={d} value={d} className="bg-[#222]">{d}</option>
+                    ))}
+                  </select>
+                  <button 
+                    onClick={handleAddBot} 
+                    disabled={(currentRoom.players?.length ?? 0) >= currentRoom.maxPlayers}
+                    className="bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-bold tracking-wider transition-colors border border-white/10"
+                  >
+                    ADD
+                  </button>
+                </div>
+              ) : (
+                <div className="text-sm font-medium text-white/40 bg-black/30 px-4 py-2 rounded-lg">Host Only</div>
+              )}
+            </div>
+
+            {/* General Info Row */}
+            <div className="w-full flex h-20 shadow-[0_4px_10px_rgba(0,0,0,0.3)] rounded-xl overflow-hidden bg-black/40 items-center gap-4 p-5 border border-white/5">
+              <div className="w-12 h-12 rounded-full border-2 border-[#555] flex items-center justify-center text-2xl bg-[#333]">⏱️</div>
+              <div>
+                <div className="font-bold text-white tracking-widest">TURN TIMER</div>
+                <div className="text-xs text-white/50 uppercase mt-0.5">120 SECONDS</div>
+              </div>
+              
+              <div className="w-px h-10 bg-white/10 mx-4"></div>
+              
+              <div className="w-12 h-12 rounded-full border-2 border-[#555] flex items-center justify-center text-2xl bg-[#333]">👥</div>
+              <div>
+                <div className="font-bold text-white tracking-widest">MAX PLAYERS</div>
+                <div className="text-xs text-white/50 uppercase mt-0.5">{currentRoom.maxPlayers} PLAYERS</div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Start Buttons */}
+          <div className="mt-auto pt-8 flex gap-4 relative z-10 w-full max-w-[650px] justify-center">
+            <button className="px-6 py-3 rounded-full border-2 border-white/20 text-white/60 font-bold hover:bg-white/5 transition-colors uppercase text-sm tracking-widest">
+              Game Rules
+            </button>
+            {isHost && (
+              <button 
+                onClick={handleStart} 
+                disabled={!canStart} 
+                className={`px-10 py-3 rounded-full font-black text-lg tracking-widest uppercase transition-all shadow-[0_4px_0_rgb(0,0,0,0.5)] border-2 border-white/20
+                  ${canStart 
+                    ? 'bg-gradient-to-b from-[#22c55e] to-[#15803d] text-white hover:from-[#16a34a] hover:to-[#166534] hover:-translate-y-0.5 active:translate-y-1 active:shadow-none' 
+                    : 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-80 shadow-none'}`}
+              >
+                {canStart ? 'START GAME' : 'WAITING...'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT PANEL: CHAT (Red) */}
+        <div className="w-full xl:w-[320px] shrink-0 flex flex-col gap-3">
+          <div className="bg-gradient-to-b from-[#3a3a3a] to-[#222222] rounded-full border-2 border-[#555] py-2 text-center font-bold text-white shadow-xl tracking-wider text-sm uppercase">
+            COMMUNICATION
+          </div>
+          
+          <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="w-full lg:w-80"
+            className="flex-1 bg-gradient-to-b from-[#ff6b3d] to-[#d61e1e] rounded-3xl border-4 border-white/95 p-3 shadow-2xl flex flex-col relative overflow-hidden min-h-[400px]"
           >
-            <ChatPanel roomId={currentRoom.id} />
+            <div className="absolute inset-0 bg-black/5 pointer-events-none"></div>
+            <div className="bg-[#ff4921]/50 rounded-t-2xl border border-white/20 text-center py-1.5 font-bold text-white text-sm mb-2 uppercase tracking-wider shadow-inner">
+              Lobby Chat
+            </div>
+            
+            {/* The actual chat panel container */}
+            <div className="flex-1 bg-black/30 rounded-xl overflow-hidden flex flex-col relative z-10 border border-white/10">
+               <ChatPanel roomId={currentRoom.id} />
+            </div>
+
+            {/* Bottom button just for visual balance */}
+            <div className="mt-4 pb-2 relative z-10">
+              <button className="w-full py-3 rounded-full border-2 border-white/40 bg-[#d61e1e] hover:bg-[#b91818] text-white font-bold tracking-widest uppercase transition-all shadow-inner text-sm">
+                JOIN VOICE (SOON)
+              </button>
+            </div>
           </motion.div>
-        )}
+        </div>
+
       </div>
     </div>
   );
