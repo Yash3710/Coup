@@ -1,4 +1,4 @@
-import { Action, BotDifficulty, Card, Character, GameState, PendingAction, PendingBlock, Player } from '@shared/types';
+import { Action, BotDifficulty, Card, Character, GameState, PendingAction, PendingBlock, Player } from '../../../shared/types';
 /**
  * AI Bot engine that decides actions based on difficulty level.
  *

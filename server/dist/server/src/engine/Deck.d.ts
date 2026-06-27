@@ -1,4 +1,4 @@
-import { Card } from '@shared/types';
+import { Card } from '../../../shared/types';
 export declare class Deck {
     private cards;
     constructor();

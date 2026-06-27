@@ -1,4 +1,4 @@
-import { Action, Character, GamePhase, GameState, GameStateView } from '@shared/types';
+import { Action, Character, GamePhase, GameState, GameStateView } from '../../../shared/types';
 export declare class GameEngine {
     private state;
     private deck;

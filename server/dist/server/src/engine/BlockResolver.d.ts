@@ -1,4 +1,4 @@
-import { Action, Character, Player } from '@shared/types';
+import { Action, Character, Player } from '../../../shared/types';
 /**
  * Returns the list of characters that can block the given action, or empty array if unblockable.
  */

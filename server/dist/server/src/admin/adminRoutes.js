@@ -11,7 +11,7 @@ const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const uuid_1 = require("uuid");
-const types_1 = require("@shared/types");
+const types_1 = require("../../../shared/types");
 const cloudinary_1 = require("cloudinary");
 cloudinary_1.v2.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

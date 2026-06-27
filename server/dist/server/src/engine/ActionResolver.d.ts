@@ -1,4 +1,4 @@
-import { Action, GameState } from '@shared/types';
+import { Action, GameState } from '../../../shared/types';
 export interface ValidationResult {
     valid: boolean;
     error?: string;

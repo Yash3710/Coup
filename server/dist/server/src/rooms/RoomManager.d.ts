@@ -1,4 +1,4 @@
-import { BotDifficulty, PlayerView, Room, RoomListItem, RoomSettings } from '@shared/types';
+import { BotDifficulty, PlayerView, Room, RoomListItem, RoomSettings } from '../../../shared/types';
 import { GameEngine } from '../engine/GameEngine';
 export interface ManagedRoom {
     room: Room;

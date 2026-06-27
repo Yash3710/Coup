@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GameEngine = void 0;
 const uuid_1 = require("uuid");
-const types_1 = require("@shared/types");
+const types_1 = require("../../../shared/types");
 const Deck_1 = require("./Deck");
 const ActionResolver_1 = require("./ActionResolver");
 const ChallengeResolver_1 = require("./ChallengeResolver");

@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupSocketHandlers = setupSocketHandlers;
-const types_1 = require("@shared/types");
+const types_1 = require("../../../shared/types");
 const BotEngine_1 = require("../bots/BotEngine");
 const RECONNECT_WINDOW_MS = 60000; // 60 seconds
 function setupSocketHandlers(io, roomManager) {

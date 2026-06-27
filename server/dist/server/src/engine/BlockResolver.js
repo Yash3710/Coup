@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getBlockingCharacters = getBlockingCharacters;
 exports.canBeBlocked = canBeBlocked;
 exports.validateBlock = validateBlock;
-const types_1 = require("@shared/types");
+const types_1 = require("../../../shared/types");
 /**
  * Returns the list of characters that can block the given action, or empty array if unblockable.
  */

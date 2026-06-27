@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Deck = void 0;
 const uuid_1 = require("uuid");
-const types_1 = require("@shared/types");
+const types_1 = require("../../../shared/types");
 class Deck {
     cards = [];
     constructor() {

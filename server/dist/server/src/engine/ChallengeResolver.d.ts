@@ -1,4 +1,4 @@
-import { Card, Character, Player } from '@shared/types';
+import { Card, Character, Player } from '../../../shared/types';
 import { Deck } from './Deck';
 export interface ChallengeResult {
     challengeSucceeded: boolean;

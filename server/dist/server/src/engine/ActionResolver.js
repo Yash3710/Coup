@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateAction = validateAction;
 exports.getAvailableActions = getAvailableActions;
-const types_1 = require("@shared/types");
+const types_1 = require("../../../shared/types");
 /**
  * Validate whether a player can perform a given action in the current game state.
  */
