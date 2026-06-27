@@ -1,0 +1,1122 @@
+import { v4 as uuidv4 } from 'uuid';
+import {
+  Action,
+  ACTION_DEFINITIONS,
+  Card,
+  CardView,
+  Character,
+  GameLogEntry,
+  GamePhase,
+  GameState,
+  GameStateView,
+  LogType,
+  PendingAction,
+  PendingBlock,
+  PendingExchange,
+  PendingExchangeView,
+  PendingLoseInfluence,
+  PendingLoseInfluenceView,
+  Player,
+  PlayerView,
+} from '@shared/types';
+import { Deck } from './Deck';
+import { validateAction, getAvailableActions } from './ActionResolver';
+import { resolveChallenge, ChallengeResult } from './ChallengeResolver';
+import { canBeBlocked, getBlockingCharacters, validateBlock } from './BlockResolver';
+
+export class GameEngine {
+  private state: GameState;
+  private deck: Deck;
+  private turnTimer: ReturnType<typeof setTimeout> | null = null;
+  private turnTimerDuration: number; // seconds
+  public onStateChange?: () => void;
+  public onBotTurn?: (playerId: string) => void;
+
+  constructor(
+    roomId: string,
+    players: Array<{ id: string; name: string; avatarUrl: string; isBot: boolean; botDifficulty?: string }>,
+    turnTimerSeconds: number = 120
+  ) {
+    this.deck = new Deck();
+    this.turnTimerDuration = turnTimerSeconds;
+
+    // Create player objects
+    const gamePlayers: Player[] = players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      avatarUrl: p.avatarUrl,
+      coins: 2,
+      cards: [],
+      alive: true,
+      connected: !p.isBot,
+      isBot: p.isBot,
+      botDifficulty: p.botDifficulty as any,
+    }));
+
+    // Deal 2 cards to each player
+    for (const player of gamePlayers) {
+      player.cards = this.deck.draw(2);
+    }
+
+    this.state = {
+      roomId,
+      players: gamePlayers,
+      deck: this.deck.getCards(),
+      currentPlayerIndex: 0,
+      phase: GamePhase.ActionPhase,
+      turnNumber: 1,
+      pendingAction: null,
+      pendingBlock: null,
+      pendingChallenge: null,
+      pendingLoseInfluence: null,
+      pendingExchange: null,
+      gameLog: [],
+      winner: null,
+      turnTimerEnd: null,
+      startedAt: Date.now(),
+    };
+
+    this.addLog('Game started!', LogType.System);
+    for (const player of gamePlayers) {
+      this.addLog(`${player.name} joins with 2 coins.`, LogType.System, player.id);
+    }
+
+    this.startTurnTimer();
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────
+
+  private addLog(message: string, type: LogType, playerId?: string, targetId?: string): void {
+    this.state.gameLog.push({
+      id: uuidv4(),
+      timestamp: Date.now(),
+      message,
+      type,
+      playerId,
+      targetId,
+    });
+  }
+
+  private syncDeck(): void {
+    this.state.deck = this.deck.getCards();
+  }
+
+  private getAlivePlayerIds(): string[] {
+    return this.state.players.filter((p) => p.alive).map((p) => p.id);
+  }
+
+  private getAlivePlayers(): Player[] {
+    return this.state.players.filter((p) => p.alive);
+  }
+
+  private getPlayerById(id: string): Player | undefined {
+    return this.state.players.find((p) => p.id === id);
+  }
+
+  private checkWinCondition(): boolean {
+    const alivePlayers = this.getAlivePlayers();
+    if (alivePlayers.length === 1) {
+      this.state.winner = alivePlayers[0].id;
+      this.state.phase = GamePhase.GameOver;
+      this.addLog(`${alivePlayers[0].name} wins the game!`, LogType.GameOver, alivePlayers[0].id);
+      this.clearTurnTimer();
+      return true;
+    }
+    return false;
+  }
+
+  private advanceTurn(): void {
+    if (this.checkWinCondition()) return;
+
+    // Move to next alive player
+    let next = (this.state.currentPlayerIndex + 1) % this.state.players.length;
+    while (!this.state.players[next].alive) {
+      next = (next + 1) % this.state.players.length;
+    }
+    this.state.currentPlayerIndex = next;
+    this.state.turnNumber++;
+    this.state.phase = GamePhase.ActionPhase;
+    this.state.pendingAction = null;
+    this.state.pendingBlock = null;
+    this.state.pendingChallenge = null;
+    this.state.pendingLoseInfluence = null;
+    this.state.pendingExchange = null;
+
+    this.syncDeck();
+    this.startTurnTimer();
+    this.emitStateChange();
+
+    // Check if it's a bot's turn
+    const currentPlayer = this.state.players[this.state.currentPlayerIndex];
+    if (currentPlayer.isBot && currentPlayer.alive) {
+      this.onBotTurn?.(currentPlayer.id);
+    }
+  }
+
+  private startTurnTimer(): void {
+    this.clearTurnTimer();
+    if (this.turnTimerDuration <= 0) return;
+
+    this.state.turnTimerEnd = Date.now() + this.turnTimerDuration * 1000;
+
+    this.turnTimer = setTimeout(() => {
+      // Auto-income on timeout
+      const current = this.state.players[this.state.currentPlayerIndex];
+      if (current.alive && this.state.phase === GamePhase.ActionPhase) {
+        this.addLog(`${current.name} timed out — auto Income.`, LogType.System, current.id);
+        current.coins += 1;
+        this.addLog(`${current.name} takes Income (+1 coin, total ${current.coins}).`, LogType.Action, current.id);
+        this.advanceTurn();
+      }
+    }, this.turnTimerDuration * 1000);
+  }
+
+  private clearTurnTimer(): void {
+    if (this.turnTimer) {
+      clearTimeout(this.turnTimer);
+      this.turnTimer = null;
+    }
+    this.state.turnTimerEnd = null;
+  }
+
+  private emitStateChange(): void {
+    this.onStateChange?.();
+  }
+
+  /**
+   * Eliminate a player (both cards revealed). Remove from active play.
+   */
+  private eliminatePlayer(player: Player): void {
+    player.alive = false;
+    this.addLog(`${player.name} has been eliminated!`, LogType.Elimination, player.id);
+  }
+
+  /**
+   * Make a player lose an influence (reveal a specific card).
+   * Returns true if the player is now eliminated.
+   */
+  private revealCard(player: Player, cardId: string): boolean {
+    const card = player.cards.find((c) => c.id === cardId && !c.revealed);
+    if (!card) {
+      throw new Error(`Card ${cardId} not found or already revealed for player ${player.name}`);
+    }
+    card.revealed = true;
+    this.addLog(`${player.name} reveals ${card.character}.`, LogType.Reveal, player.id);
+
+    // Check if all cards are revealed
+    const aliveCards = player.cards.filter((c) => !c.revealed);
+    if (aliveCards.length === 0) {
+      this.eliminatePlayer(player);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get the players who still need to respond in a challenge/block phase.
+   * "Eligible responders" are alive players excluding the acting player (and target, depending on context).
+   */
+  private getEligibleChallengers(excludeId: string): string[] {
+    return this.state.players
+      .filter((p) => p.alive && p.id !== excludeId)
+      .map((p) => p.id);
+  }
+
+  /**
+   * Get players eligible to block: for targeted actions, only the target; for ForeignAid, any other alive player.
+   */
+  private getEligibleBlockers(action: Action, actingPlayerId: string, targetId?: string): string[] {
+    if (!canBeBlocked(action)) return [];
+
+    const actionDef = ACTION_DEFINITIONS[action];
+    if (actionDef.requiresTarget && targetId) {
+      // Only the target can block targeted blockable actions (Assassinate, Steal)
+      const target = this.getPlayerById(targetId);
+      if (target && target.alive) return [targetId];
+      return [];
+    }
+
+    // For Foreign Aid, any alive player except the actor can block
+    return this.state.players
+      .filter((p) => p.alive && p.id !== actingPlayerId)
+      .map((p) => p.id);
+  }
+
+  // ─── Public API: Game Actions ──────────────────────────────────
+
+  /**
+   * A player performs an action on their turn.
+   */
+  performAction(playerId: string, action: Action, targetId?: string): { success: boolean; error?: string } {
+    if (this.state.phase !== GamePhase.ActionPhase) {
+      return { success: false, error: 'Not in action phase.' };
+    }
+
+    const validation = validateAction(this.state, playerId, action, targetId);
+    if (!validation.valid) {
+      return { success: false, error: validation.error };
+    }
+
+    const player = this.getPlayerById(playerId)!;
+    const actionDef = ACTION_DEFINITIONS[action];
+
+    // Deduct costs immediately (Coup and Assassinate costs are paid upfront)
+    if (actionDef.cost > 0) {
+      player.coins -= actionDef.cost;
+      this.addLog(`${player.name} pays ${actionDef.cost} coins.`, LogType.CoinChange, playerId);
+    }
+
+    const targetName = targetId ? this.getPlayerById(targetId)?.name : undefined;
+
+    // Log the action
+    if (targetName) {
+      this.addLog(`${player.name} uses ${action} on ${targetName}.`, LogType.Action, playerId, targetId);
+    } else {
+      this.addLog(`${player.name} uses ${action}.`, LogType.Action, playerId);
+    }
+
+    // Determine the claimed character for challengeable actions
+    const claimedCharacter = actionDef.requiredCharacter;
+
+    // Set pending action
+    this.state.pendingAction = {
+      playerId,
+      action,
+      targetId,
+      claimedCharacter,
+      respondedPlayers: [],
+    };
+
+    this.clearTurnTimer();
+
+    // Route based on whether action can be challenged
+    if (actionDef.canBeChallenged) {
+      // Go to challenge phase first
+      this.state.phase = GamePhase.ChallengePhase;
+      this.syncDeck();
+      this.emitStateChange();
+    } else if (actionDef.canBeBlocked) {
+      // e.g. Foreign Aid — cannot be challenged but can be blocked
+      this.state.phase = GamePhase.BlockPhase;
+      this.syncDeck();
+      this.emitStateChange();
+    } else {
+      // Income and Coup — resolve immediately
+      this.resolveAction();
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * A player challenges the pending action's character claim.
+   */
+  handleChallenge(challengerId: string): { success: boolean; error?: string } {
+    if (this.state.phase !== GamePhase.ChallengePhase) {
+      return { success: false, error: 'Not in challenge phase.' };
+    }
+
+    const pendingAction = this.state.pendingAction;
+    if (!pendingAction) {
+      return { success: false, error: 'No pending action to challenge.' };
+    }
+
+    const challenger = this.getPlayerById(challengerId);
+    if (!challenger || !challenger.alive) {
+      return { success: false, error: 'You cannot challenge.' };
+    }
+
+    if (challengerId === pendingAction.playerId) {
+      return { success: false, error: 'Cannot challenge your own action.' };
+    }
+
+    if (!pendingAction.claimedCharacter) {
+      return { success: false, error: 'This action cannot be challenged.' };
+    }
+
+    this.addLog(
+      `${challenger.name} challenges ${this.getPlayerById(pendingAction.playerId)!.name}'s claim of ${pendingAction.claimedCharacter}.`,
+      LogType.Challenge,
+      challengerId,
+      pendingAction.playerId
+    );
+
+    // Resolve the challenge
+    const result = resolveChallenge(
+      this.state.players,
+      this.deck,
+      challengerId,
+      pendingAction.playerId,
+      pendingAction.claimedCharacter
+    );
+
+    this.addLog(result.message, LogType.Challenge);
+    this.syncDeck();
+
+    if (result.challengeSucceeded) {
+      // The acting player was bluffing — they must lose influence, action is cancelled
+      this.state.pendingChallenge = null;
+      this.state.pendingLoseInfluence = {
+        playerId: pendingAction.playerId,
+        reason: `Lost challenge — did not have ${pendingAction.claimedCharacter}`,
+        continueAction: false, // Action cancelled
+      };
+      this.state.phase = GamePhase.ResolveLoseInfluence;
+
+      // Check if the bluffer has only 1 unrevealed card, auto-reveal
+      this.autoRevealIfOneCard(pendingAction.playerId);
+    } else {
+      // Challenge failed — challenger must lose influence, then action continues
+      this.state.pendingChallenge = null;
+      this.state.pendingLoseInfluence = {
+        playerId: challengerId,
+        reason: `Lost challenge — ${this.getPlayerById(pendingAction.playerId)!.name} had ${pendingAction.claimedCharacter}`,
+        continueAction: true,
+        originalAction: { ...pendingAction },
+      };
+      this.state.phase = GamePhase.ResolveLoseInfluence;
+
+      this.autoRevealIfOneCard(challengerId);
+    }
+
+    this.emitStateChange();
+    return { success: true };
+  }
+
+  /**
+   * A player passes on challenging the pending action.
+   */
+  handlePassChallenge(playerId: string): { success: boolean; error?: string } {
+    if (this.state.phase !== GamePhase.ChallengePhase) {
+      return { success: false, error: 'Not in challenge phase.' };
+    }
+
+    const pendingAction = this.state.pendingAction;
+    if (!pendingAction) {
+      return { success: false, error: 'No pending action.' };
+    }
+
+    const player = this.getPlayerById(playerId);
+    if (!player || !player.alive) {
+      return { success: false, error: 'You cannot pass.' };
+    }
+
+    if (playerId === pendingAction.playerId) {
+      return { success: false, error: 'You cannot pass on your own action.' };
+    }
+
+    if (pendingAction.respondedPlayers.includes(playerId)) {
+      return { success: false, error: 'You have already responded.' };
+    }
+
+    pendingAction.respondedPlayers.push(playerId);
+
+    // Check if all eligible players have passed
+    const eligible = this.getEligibleChallengers(pendingAction.playerId);
+    const allPassed = eligible.every((id) => pendingAction.respondedPlayers.includes(id));
+
+    if (allPassed) {
+      // Challenge phase complete — move to block phase or resolve
+      const actionDef = ACTION_DEFINITIONS[pendingAction.action];
+      if (actionDef.canBeBlocked) {
+        this.state.phase = GamePhase.BlockPhase;
+        // Reset responded players for block phase
+        // (respondedPlayers on pendingAction is for challenge; block has its own tracking below)
+      } else {
+        // Resolve the action
+        this.resolveAction();
+        return { success: true };
+      }
+    }
+
+    this.emitStateChange();
+    return { success: true };
+  }
+
+  /**
+   * A player blocks the pending action.
+   */
+  handleBlock(blockerId: string, claimedCharacter: Character): { success: boolean; error?: string } {
+    if (this.state.phase !== GamePhase.BlockPhase) {
+      return { success: false, error: 'Not in block phase.' };
+    }
+
+    const pendingAction = this.state.pendingAction;
+    if (!pendingAction) {
+      return { success: false, error: 'No pending action to block.' };
+    }
+
+    const blockValidation = validateBlock(
+      this.state.players,
+      blockerId,
+      pendingAction.action,
+      pendingAction.targetId,
+      claimedCharacter
+    );
+
+    if (!blockValidation.valid) {
+      return { success: false, error: blockValidation.error };
+    }
+
+    const blocker = this.getPlayerById(blockerId)!;
+    this.addLog(
+      `${blocker.name} blocks with ${claimedCharacter}.`,
+      LogType.Block,
+      blockerId,
+      pendingAction.playerId
+    );
+
+    this.state.pendingBlock = {
+      blockerId,
+      claimedCharacter,
+      originalAction: pendingAction.action,
+      originalPlayerId: pendingAction.playerId,
+      targetId: pendingAction.targetId,
+      respondedPlayers: [],
+    };
+
+    this.state.phase = GamePhase.BlockChallengePhase;
+    this.emitStateChange();
+    return { success: true };
+  }
+
+  /**
+   * A player passes on blocking the pending action.
+   */
+  handlePassBlock(playerId: string): { success: boolean; error?: string } {
+    if (this.state.phase !== GamePhase.BlockPhase) {
+      return { success: false, error: 'Not in block phase.' };
+    }
+
+    const pendingAction = this.state.pendingAction;
+    if (!pendingAction) {
+      return { success: false, error: 'No pending action.' };
+    }
+
+    const player = this.getPlayerById(playerId);
+    if (!player || !player.alive) {
+      return { success: false, error: 'You cannot pass.' };
+    }
+
+    // The acting player should not need to pass on their own block window
+    // But we track it so they don't hold things up
+    const eligible = this.getEligibleBlockers(pendingAction.action, pendingAction.playerId, pendingAction.targetId);
+
+    if (!eligible.includes(playerId)) {
+      // Player isn't eligible to block, but still allow pass (for UI flow — or just ignore)
+      return { success: false, error: 'You are not eligible to block this action.' };
+    }
+
+    if (!pendingAction.respondedPlayers.includes(playerId)) {
+      // Re-use respondedPlayers for block tracking
+      // But we need separate tracking — use a separate field
+      // Actually, let's track block passes differently
+    }
+
+    // We'll use the pendingAction.respondedPlayers array which was reset implicitly
+    // Actually we haven't reset it. Let's use a different approach:
+    // Track block passes in a local set approach. Since we can't add fields to the type,
+    // reuse respondedPlayers — but it already has challenge passes.
+    // Solution: when we transition to BlockPhase, we clear respondedPlayers.
+    // Let's do that fix in the pass_challenge all-passed block above.
+
+    // For now, let's use a different tracking mechanism.
+    // We need to track who has passed on blocking. The simplest approach:
+    // Clear respondedPlayers when entering block phase.
+    // We did NOT clear it above, so let's handle it here carefully.
+
+    // Actually, let me just track it: if all eligible blockers have passed, resolve.
+    // We need a clean list. Let's make the respondedPlayers tracking work:
+
+    if (pendingAction.respondedPlayers.includes(`block_pass_${playerId}`)) {
+      return { success: false, error: 'You have already passed on blocking.' };
+    }
+
+    pendingAction.respondedPlayers.push(`block_pass_${playerId}`);
+
+    const allBlockersPassed = eligible.every(
+      (id) => pendingAction.respondedPlayers.includes(`block_pass_${id}`)
+    );
+
+    if (allBlockersPassed) {
+      // No one blocked — resolve the action
+      this.resolveAction();
+      return { success: true };
+    }
+
+    this.emitStateChange();
+    return { success: true };
+  }
+
+  /**
+   * A player challenges the pending block's character claim.
+   */
+  handleChallengeBlock(challengerId: string): { success: boolean; error?: string } {
+    if (this.state.phase !== GamePhase.BlockChallengePhase) {
+      return { success: false, error: 'Not in block challenge phase.' };
+    }
+
+    const pendingBlock = this.state.pendingBlock;
+    if (!pendingBlock) {
+      return { success: false, error: 'No pending block to challenge.' };
+    }
+
+    const challenger = this.getPlayerById(challengerId);
+    if (!challenger || !challenger.alive) {
+      return { success: false, error: 'You cannot challenge.' };
+    }
+
+    if (challengerId === pendingBlock.blockerId) {
+      return { success: false, error: 'Cannot challenge your own block.' };
+    }
+
+    this.addLog(
+      `${challenger.name} challenges ${this.getPlayerById(pendingBlock.blockerId)!.name}'s block with ${pendingBlock.claimedCharacter}.`,
+      LogType.Challenge,
+      challengerId,
+      pendingBlock.blockerId
+    );
+
+    const result = resolveChallenge(
+      this.state.players,
+      this.deck,
+      challengerId,
+      pendingBlock.blockerId,
+      pendingBlock.claimedCharacter
+    );
+
+    this.addLog(result.message, LogType.Challenge);
+    this.syncDeck();
+
+    if (result.challengeSucceeded) {
+      // Blocker was bluffing — blocker loses influence, original action proceeds
+      this.state.pendingChallenge = null;
+      this.state.pendingLoseInfluence = {
+        playerId: pendingBlock.blockerId,
+        reason: `Lost block challenge — did not have ${pendingBlock.claimedCharacter}`,
+        continueAction: true,
+        originalAction: {
+          playerId: pendingBlock.originalPlayerId,
+          action: pendingBlock.originalAction,
+          targetId: pendingBlock.targetId,
+          claimedCharacter: ACTION_DEFINITIONS[pendingBlock.originalAction].requiredCharacter,
+          respondedPlayers: [],
+        },
+      };
+      this.state.phase = GamePhase.ResolveLoseInfluence;
+      this.autoRevealIfOneCard(pendingBlock.blockerId);
+    } else {
+      // Block challenge failed — challenger loses influence, block stands (action cancelled)
+      this.state.pendingChallenge = null;
+      this.state.pendingLoseInfluence = {
+        playerId: challengerId,
+        reason: `Lost block challenge — ${this.getPlayerById(pendingBlock.blockerId)!.name} had ${pendingBlock.claimedCharacter}`,
+        continueAction: false, // Block succeeded, action is cancelled
+      };
+      this.state.phase = GamePhase.ResolveLoseInfluence;
+      this.autoRevealIfOneCard(challengerId);
+    }
+
+    this.emitStateChange();
+    return { success: true };
+  }
+
+  /**
+   * A player passes on challenging the pending block.
+   */
+  handlePassBlockChallenge(playerId: string): { success: boolean; error?: string } {
+    if (this.state.phase !== GamePhase.BlockChallengePhase) {
+      return { success: false, error: 'Not in block challenge phase.' };
+    }
+
+    const pendingBlock = this.state.pendingBlock;
+    if (!pendingBlock) {
+      return { success: false, error: 'No pending block.' };
+    }
+
+    const player = this.getPlayerById(playerId);
+    if (!player || !player.alive) {
+      return { success: false, error: 'You cannot pass.' };
+    }
+
+    if (playerId === pendingBlock.blockerId) {
+      return { success: false, error: 'You cannot pass on your own block.' };
+    }
+
+    if (pendingBlock.respondedPlayers.includes(playerId)) {
+      return { success: false, error: 'You have already responded.' };
+    }
+
+    pendingBlock.respondedPlayers.push(playerId);
+
+    // Check if all eligible players have passed on challenging the block
+    const eligible = this.getEligibleChallengers(pendingBlock.blockerId);
+    const allPassed = eligible.every((id) => pendingBlock.respondedPlayers.includes(id));
+
+    if (allPassed) {
+      // Block succeeds — action is cancelled, advance turn
+      this.addLog(
+        `Block by ${this.getPlayerById(pendingBlock.blockerId)!.name} succeeds. Action cancelled.`,
+        LogType.Block,
+        pendingBlock.blockerId
+      );
+      this.state.pendingBlock = null;
+      this.state.pendingAction = null;
+      this.advanceTurn();
+      return { success: true };
+    }
+
+    this.emitStateChange();
+    return { success: true };
+  }
+
+  /**
+   * A player chooses which card to lose when they must lose influence.
+   */
+  handleLoseInfluence(playerId: string, cardId: string): { success: boolean; error?: string } {
+    if (this.state.phase !== GamePhase.ResolveLoseInfluence) {
+      return { success: false, error: 'Not in lose influence phase.' };
+    }
+
+    const pending = this.state.pendingLoseInfluence;
+    if (!pending) {
+      return { success: false, error: 'No pending influence loss.' };
+    }
+
+    if (pending.playerId !== playerId) {
+      return { success: false, error: 'It is not your turn to lose influence.' };
+    }
+
+    const player = this.getPlayerById(playerId)!;
+    const card = player.cards.find((c) => c.id === cardId && !c.revealed);
+    if (!card) {
+      return { success: false, error: 'Invalid card selection.' };
+    }
+
+    const eliminated = this.revealCard(player, cardId);
+    this.syncDeck();
+
+    if (pending.continueAction && pending.originalAction) {
+      // Continue with the original action (after failed challenge of action, or failed block challenge where action proceeds)
+      const originalAction = pending.originalAction;
+      this.state.pendingLoseInfluence = null;
+      this.state.pendingAction = originalAction;
+
+      // Check if we need to go to block phase for this action
+      const actionDef = ACTION_DEFINITIONS[originalAction.action];
+
+      // If the original action can be blocked and we haven't been through block phase yet,
+      // go to block phase. But if we just came from a block challenge, resolve the action.
+      if (this.state.pendingBlock) {
+        // We came from a block challenge — the block failed, resolve the action
+        this.state.pendingBlock = null;
+        this.resolveAction();
+      } else if (actionDef.canBeBlocked) {
+        // Check if the target is still alive for blocking
+        const target = originalAction.targetId ? this.getPlayerById(originalAction.targetId) : null;
+        if (target && !target.alive) {
+          // Target eliminated during challenge resolution, advance turn
+          this.state.pendingAction = null;
+          this.advanceTurn();
+        } else {
+          this.state.phase = GamePhase.BlockPhase;
+          this.emitStateChange();
+        }
+      } else {
+        this.resolveAction();
+      }
+    } else {
+      // Action was cancelled (bluffer lost or block succeeded)
+      this.state.pendingLoseInfluence = null;
+      this.state.pendingAction = null;
+      this.state.pendingBlock = null;
+
+      if (this.checkWinCondition()) {
+        this.emitStateChange();
+        return { success: true };
+      }
+
+      this.advanceTurn();
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * A player chooses which cards to keep during an Exchange.
+   */
+  handleExchangeChoice(playerId: string, keepCardIds: string[]): { success: boolean; error?: string } {
+    if (this.state.phase !== GamePhase.ExchangePhase) {
+      return { success: false, error: 'Not in exchange phase.' };
+    }
+
+    const pending = this.state.pendingExchange;
+    if (!pending) {
+      return { success: false, error: 'No pending exchange.' };
+    }
+
+    if (pending.playerId !== playerId) {
+      return { success: false, error: 'It is not your exchange.' };
+    }
+
+    const player = this.getPlayerById(playerId)!;
+    const aliveCardCount = player.cards.filter((c) => !c.revealed).length;
+
+    if (keepCardIds.length !== aliveCardCount) {
+      return { success: false, error: `You must keep exactly ${aliveCardCount} cards.` };
+    }
+
+    // Build the combined pool (player's alive cards + drawn cards)
+    const allAvailable = [...pending.playerCards.filter(c => !c.revealed), ...pending.drawnCards];
+    const allIds = allAvailable.map((c) => c.id);
+
+    // Validate all keep card IDs are from the pool
+    for (const kid of keepCardIds) {
+      if (!allIds.includes(kid)) {
+        return { success: false, error: `Card ${kid} is not in the exchange pool.` };
+      }
+    }
+
+    // Check for duplicates
+    if (new Set(keepCardIds).size !== keepCardIds.length) {
+      return { success: false, error: 'Duplicate card selections.' };
+    }
+
+    // Keep the selected cards, return the rest to deck
+    const keptCards = keepCardIds.map((id) => allAvailable.find((c) => c.id === id)!);
+    const returnedCards = allAvailable.filter((c) => !keepCardIds.includes(c.id));
+
+    // Update player's cards: keep revealed cards + new kept cards
+    const revealedCards = player.cards.filter((c) => c.revealed);
+    player.cards = [...revealedCards, ...keptCards];
+
+    // Return unkept cards to deck
+    this.deck.returnCards(returnedCards);
+    this.syncDeck();
+
+    this.addLog(`${player.name} completes exchange.`, LogType.Action, playerId);
+
+    this.state.pendingExchange = null;
+    this.advanceTurn();
+    return { success: true };
+  }
+
+  // ─── Action Resolution ─────────────────────────────────────────
+
+  /**
+   * Resolve the current pending action (after challenge/block windows have passed).
+   */
+  private resolveAction(): void {
+    const pending = this.state.pendingAction;
+    if (!pending) return;
+
+    const player = this.getPlayerById(pending.playerId);
+    if (!player || !player.alive) {
+      // Acting player died during challenge resolution
+      this.state.pendingAction = null;
+      this.advanceTurn();
+      return;
+    }
+
+    const target = pending.targetId ? this.getPlayerById(pending.targetId) : undefined;
+
+    switch (pending.action) {
+      case Action.Income:
+        player.coins += 1;
+        this.addLog(`${player.name} takes Income (+1 coin, total ${player.coins}).`, LogType.CoinChange, player.id);
+        this.state.pendingAction = null;
+        this.advanceTurn();
+        break;
+
+      case Action.ForeignAid:
+        player.coins += 2;
+        this.addLog(`${player.name} takes Foreign Aid (+2 coins, total ${player.coins}).`, LogType.CoinChange, player.id);
+        this.state.pendingAction = null;
+        this.advanceTurn();
+        break;
+
+      case Action.Tax:
+        player.coins += 3;
+        this.addLog(`${player.name} collects Tax (+3 coins, total ${player.coins}).`, LogType.CoinChange, player.id);
+        this.state.pendingAction = null;
+        this.advanceTurn();
+        break;
+
+      case Action.Coup:
+        if (target && target.alive) {
+          this.addLog(`${player.name} launches a Coup against ${target.name}!`, LogType.Action, player.id, target.id);
+          // Target must lose influence
+          this.state.pendingAction = null;
+          this.state.pendingLoseInfluence = {
+            playerId: target.id,
+            reason: `Coup by ${player.name}`,
+            continueAction: false,
+          };
+          this.state.phase = GamePhase.ResolveLoseInfluence;
+          this.autoRevealIfOneCard(target.id);
+          this.emitStateChange();
+        } else {
+          this.state.pendingAction = null;
+          this.advanceTurn();
+        }
+        break;
+
+      case Action.Assassinate:
+        if (target && target.alive) {
+          this.addLog(`${player.name} assassinates ${target.name}!`, LogType.Action, player.id, target.id);
+          this.state.pendingAction = null;
+          this.state.pendingLoseInfluence = {
+            playerId: target.id,
+            reason: `Assassination by ${player.name}`,
+            continueAction: false,
+          };
+          this.state.phase = GamePhase.ResolveLoseInfluence;
+          this.autoRevealIfOneCard(target.id);
+          this.emitStateChange();
+        } else {
+          this.state.pendingAction = null;
+          this.advanceTurn();
+        }
+        break;
+
+      case Action.Steal:
+        if (target && target.alive) {
+          const stolen = Math.min(2, target.coins);
+          target.coins -= stolen;
+          player.coins += stolen;
+          this.addLog(
+            `${player.name} steals ${stolen} coins from ${target.name}. (${player.name}: ${player.coins}, ${target.name}: ${target.coins})`,
+            LogType.CoinChange,
+            player.id,
+            target.id
+          );
+          this.state.pendingAction = null;
+          this.advanceTurn();
+        } else {
+          this.state.pendingAction = null;
+          this.advanceTurn();
+        }
+        break;
+
+      case Action.Exchange: {
+        // Draw 2 cards from deck
+        const drawnCards = this.deck.draw(2);
+        this.syncDeck();
+
+        this.state.pendingExchange = {
+          playerId: player.id,
+          drawnCards,
+          playerCards: player.cards.map((c) => ({ ...c })),
+        };
+
+        this.state.pendingAction = null;
+        this.state.phase = GamePhase.ExchangePhase;
+        this.addLog(`${player.name} exchanges cards.`, LogType.Action, player.id);
+        this.emitStateChange();
+
+        // If it's a bot, trigger bot exchange
+        if (player.isBot) {
+          this.onBotTurn?.(player.id);
+        }
+        break;
+      }
+    }
+  }
+
+  /**
+   * If a player only has one unrevealed card, automatically reveal it.
+   */
+  private autoRevealIfOneCard(playerId: string): void {
+    const player = this.getPlayerById(playerId);
+    if (!player) return;
+
+    const unrevealed = player.cards.filter((c) => !c.revealed);
+    if (unrevealed.length === 1) {
+      // Auto-reveal
+      const card = unrevealed[0];
+      this.revealCard(player, card.id);
+      this.syncDeck();
+
+      // Since we auto-revealed, check if the pending lose influence is for this player
+      if (
+        this.state.pendingLoseInfluence &&
+        this.state.pendingLoseInfluence.playerId === playerId
+      ) {
+        // Already handled in revealCard/eliminatePlayer
+        const pending = this.state.pendingLoseInfluence;
+
+        if (pending.continueAction && pending.originalAction) {
+          const originalAction = pending.originalAction;
+          this.state.pendingLoseInfluence = null;
+          this.state.pendingAction = originalAction;
+
+          const actionDef = ACTION_DEFINITIONS[originalAction.action];
+
+          if (this.state.pendingBlock) {
+            this.state.pendingBlock = null;
+            this.resolveAction();
+          } else if (actionDef.canBeBlocked) {
+            const target = originalAction.targetId ? this.getPlayerById(originalAction.targetId) : null;
+            if (target && !target.alive) {
+              this.state.pendingAction = null;
+              this.advanceTurn();
+            } else {
+              this.state.phase = GamePhase.BlockPhase;
+              this.emitStateChange();
+            }
+          } else {
+            this.resolveAction();
+          }
+        } else {
+          this.state.pendingLoseInfluence = null;
+          this.state.pendingAction = null;
+          this.state.pendingBlock = null;
+
+          if (!this.checkWinCondition()) {
+            this.advanceTurn();
+          } else {
+            this.emitStateChange();
+          }
+        }
+      }
+    }
+  }
+
+  // ─── State Views ───────────────────────────────────────────────
+
+  /**
+   * Build a GameStateView for a specific player (shows own cards, hides opponents').
+   */
+  getStateForPlayer(playerId: string): GameStateView {
+    return {
+      roomId: this.state.roomId,
+      players: this.state.players.map((p) => this.toPlayerView(p, playerId)),
+      currentPlayerIndex: this.state.currentPlayerIndex,
+      phase: this.state.phase,
+      turnNumber: this.state.turnNumber,
+      pendingAction: this.state.pendingAction,
+      pendingBlock: this.state.pendingBlock,
+      pendingChallenge: this.state.pendingChallenge,
+      pendingLoseInfluence: this.state.pendingLoseInfluence
+        ? this.toPendingLoseInfluenceView(this.state.pendingLoseInfluence)
+        : null,
+      pendingExchange: this.state.pendingExchange
+        ? this.toPendingExchangeView(this.state.pendingExchange, playerId)
+        : null,
+      gameLog: this.state.gameLog,
+      winner: this.state.winner,
+      turnTimerEnd: this.state.turnTimerEnd,
+      startedAt: this.state.startedAt,
+      myPlayerId: playerId,
+    };
+  }
+
+  /**
+   * Build a GameStateView for a spectator (all cards hidden unless revealed).
+   */
+  getStateForSpectator(): GameStateView {
+    return {
+      roomId: this.state.roomId,
+      players: this.state.players.map((p) => this.toPlayerView(p, '__spectator__')),
+      currentPlayerIndex: this.state.currentPlayerIndex,
+      phase: this.state.phase,
+      turnNumber: this.state.turnNumber,
+      pendingAction: this.state.pendingAction,
+      pendingBlock: this.state.pendingBlock,
+      pendingChallenge: this.state.pendingChallenge,
+      pendingLoseInfluence: this.state.pendingLoseInfluence
+        ? this.toPendingLoseInfluenceView(this.state.pendingLoseInfluence)
+        : null,
+      pendingExchange: null, // Spectators don't see exchange cards
+      gameLog: this.state.gameLog,
+      winner: this.state.winner,
+      turnTimerEnd: this.state.turnTimerEnd,
+      startedAt: this.state.startedAt,
+      myPlayerId: '__spectator__',
+    };
+  }
+
+  private toPlayerView(player: Player, viewingPlayerId: string): PlayerView {
+    const isOwn = player.id === viewingPlayerId;
+    return {
+      id: player.id,
+      name: player.name,
+      avatarUrl: player.avatarUrl,
+      coins: player.coins,
+      cards: player.cards.map((c) => this.toCardView(c, isOwn)),
+      alive: player.alive,
+      connected: player.connected,
+      isBot: player.isBot,
+    };
+  }
+
+  private toCardView(card: Card, isOwn: boolean): CardView {
+    if (isOwn || card.revealed) {
+      return {
+        id: card.id,
+        character: card.character,
+        revealed: card.revealed,
+      };
+    }
+    return {
+      id: card.id,
+      revealed: false,
+    };
+  }
+
+  private toPendingLoseInfluenceView(pending: PendingLoseInfluence): PendingLoseInfluenceView {
+    return {
+      playerId: pending.playerId,
+      reason: pending.reason,
+    };
+  }
+
+  private toPendingExchangeView(pending: PendingExchange, viewingPlayerId: string): PendingExchangeView {
+    if (viewingPlayerId === pending.playerId) {
+      // The exchanging player sees their available cards
+      const allCards = [...pending.playerCards.filter(c => !c.revealed), ...pending.drawnCards];
+      const keepCount = pending.playerCards.filter(c => !c.revealed).length;
+      return {
+        playerId: pending.playerId,
+        availableCards: allCards,
+        keepCount,
+      };
+    }
+    return {
+      playerId: pending.playerId,
+    };
+  }
+
+  // ─── Utility ───────────────────────────────────────────────────
+
+  getGameState(): GameState {
+    return this.state;
+  }
+
+  getPhase(): GamePhase {
+    return this.state.phase;
+  }
+
+  getCurrentPlayerId(): string {
+    return this.state.players[this.state.currentPlayerIndex].id;
+  }
+
+  isGameOver(): boolean {
+    return this.state.phase === GamePhase.GameOver;
+  }
+
+  setPlayerConnected(playerId: string, connected: boolean): void {
+    const player = this.getPlayerById(playerId);
+    if (player) {
+      player.connected = connected;
+    }
+  }
+
+  getAvailableActions(playerId: string): Action[] {
+    return getAvailableActions(this.state, playerId);
+  }
+
+  destroy(): void {
+    this.clearTurnTimer();
+  }
+}

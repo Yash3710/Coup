@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-500: #3b82f6; /* Blue */
+  --color-primary-600: #2563eb;
+  --color-bg-dark: #0f172a; /* Slate 900 */
+  --color-bg-panel: #1e293b; /* Slate 800 */
+}
+
+@layer base {
+  body {
+    background-color: #0f172a;
+    color: #f8fafc; /* Slate 50 */
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  .dashboard-panel {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  .dashboard-panel-subtle {
+    background-color: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+  }
+
+  .turn-active {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 1px #3b82f6 !important;
+  }
+
+  .btn-primary {
+    background-color: #3b82f6;
+    color: white;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 8px 16px;
+    transition: background-color 0.15s ease-in-out;
+  }
+  
+  .btn-primary:hover {
+    background-color: #2563eb;
+  }
+  
+  .btn-danger {
+    background-color: #ef4444;
+    color: white;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 8px 16px;
+    transition: background-color 0.15s ease-in-out;
+  }
+  
+  .btn-danger:hover {
+    background-color: #dc2626;
+  }
+  
+  .btn-secondary {
+    background-color: #334155;
+    color: white;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 8px 16px;
+    transition: background-color 0.15s ease-in-out;
+  }
+  
+  .btn-secondary:hover {
+    background-color: #475569;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

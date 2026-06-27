@@ -1,0 +1,1 @@
+{"root":["../../src/server.ts","../../src/admin/adminroutes.ts","../../src/bots/botengine.ts","../../src/engine/actionresolver.ts","../../src/engine/blockresolver.ts","../../src/engine/challengeresolver.ts","../../src/engine/deck.ts","../../src/engine/gameengine.ts","../../src/rooms/roommanager.ts","../../src/socket/sockethandler.ts","../../../shared/types.ts"],"version":"5.9.3"}
