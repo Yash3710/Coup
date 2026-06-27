@@ -181,12 +181,12 @@ export class RoomManager {
       return { success: false, error: 'Player not in this room.', roomDestroyed: false };
     }
 
-    room.players.splice(playerIndex, 1);
-    managed.playerData = managed.playerData.filter((p) => p.id !== playerId);
-
-    // If the game is in progress and a player leaves, mark them disconnected in the engine
+    // If the game is in progress and a player leaves, keep them in the room but mark them disconnected
     if (managed.engine) {
       managed.engine.setPlayerConnected(playerId, false);
+    } else {
+      room.players.splice(playerIndex, 1);
+      managed.playerData = managed.playerData.filter((p) => p.id !== playerId);
     }
 
     // If no human players left, destroy the room

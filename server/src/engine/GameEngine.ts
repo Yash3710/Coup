@@ -1109,6 +1109,106 @@ export class GameEngine {
     const player = this.getPlayerById(playerId);
     if (player) {
       player.connected = connected;
+      if (!connected && !this.isGameOver() && player.alive) {
+        this.eliminateDisconnectedPlayer(playerId);
+        this.emitStateChange();
+      }
+    }
+  }
+
+  private eliminateDisconnectedPlayer(playerId: string): void {
+    const player = this.getPlayerById(playerId);
+    if (!player || !player.alive) return;
+
+    this.addLog(`${player.name} disconnected and forfeited.`, LogType.Elimination, playerId);
+    
+    player.cards.forEach(c => {
+      if (!c.revealed) {
+        c.revealed = true;
+        this.addLog(`${player.name} revealed ${c.character}`, LogType.Elimination, playerId);
+      }
+    });
+    player.alive = false;
+
+    if (this.checkWinCondition()) return;
+
+    // Resolve any pending state blocking on this player
+    this.resolvePendingPhasesAfterElimination();
+  }
+
+  private resolvePendingPhasesAfterElimination(): void {
+    if (this.state.phase === GamePhase.ActionPhase) {
+      if (!this.getPlayerById(this.getCurrentPlayerId())?.alive) {
+        this.advanceTurn();
+      }
+    } else if (this.state.phase === GamePhase.ChallengePhase) {
+      const pendingAction = this.state.pendingAction!;
+      const eligible = this.getEligibleChallengers(pendingAction.playerId);
+      const allPassed = eligible.every((id) => pendingAction.respondedPlayers.includes(id));
+      if (allPassed) {
+        const actionDef = ACTION_DEFINITIONS[pendingAction.action];
+        if (actionDef.canBeBlocked) {
+          const target = pendingAction.targetId ? this.getPlayerById(pendingAction.targetId) : null;
+          if (target && !target.alive) {
+            this.state.pendingAction = null;
+            this.advanceTurn();
+          } else {
+            this.state.phase = GamePhase.BlockPhase;
+          }
+        } else {
+          this.resolveAction();
+        }
+      }
+    } else if (this.state.phase === GamePhase.BlockPhase) {
+      const pendingAction = this.state.pendingAction!;
+      const eligible = this.getEligibleBlockers(pendingAction.action, pendingAction.playerId, pendingAction.targetId);
+      const allPassed = eligible.every((id) => pendingAction.respondedPlayers.includes(id));
+      if (allPassed) {
+        this.resolveAction();
+      }
+    } else if (this.state.phase === GamePhase.BlockChallengePhase) {
+      const pendingBlock = this.state.pendingBlock!;
+      const eligible = this.getEligibleChallengers(pendingBlock.blockerId);
+      const allPassed = eligible.every((id) => pendingBlock.respondedPlayers.includes(id));
+      if (allPassed) {
+        this.state.pendingAction = null;
+        this.state.pendingBlock = null;
+        this.advanceTurn();
+      }
+    } else if (this.state.phase === GamePhase.ResolveLoseInfluence) {
+      const pending = this.state.pendingLoseInfluence!;
+      if (!this.getPlayerById(pending.playerId)?.alive) {
+        if (pending.continueAction && pending.originalAction) {
+          const originalAction = pending.originalAction;
+          this.state.pendingLoseInfluence = null;
+          this.state.pendingAction = originalAction;
+          const actionDef = ACTION_DEFINITIONS[originalAction.action];
+          if (this.state.pendingBlock) {
+            this.state.pendingBlock = null;
+            this.resolveAction();
+          } else if (actionDef.canBeBlocked) {
+            const target = originalAction.targetId ? this.getPlayerById(originalAction.targetId) : null;
+            if (target && !target.alive) {
+              this.state.pendingAction = null;
+              this.advanceTurn();
+            } else {
+              this.state.phase = GamePhase.BlockPhase;
+            }
+          } else {
+            this.resolveAction();
+          }
+        } else {
+          this.state.pendingLoseInfluence = null;
+          this.state.pendingAction = null;
+          this.state.pendingBlock = null;
+          this.advanceTurn();
+        }
+      }
+    } else if (this.state.phase === GamePhase.ExchangePhase) {
+      if (!this.getPlayerById(this.getCurrentPlayerId())?.alive) {
+        this.state.pendingAction = null;
+        this.advanceTurn();
+      }
     }
   }
 

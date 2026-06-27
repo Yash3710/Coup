@@ -129,6 +129,8 @@ export declare class GameEngine {
     getCurrentPlayerId(): string;
     isGameOver(): boolean;
     setPlayerConnected(playerId: string, connected: boolean): void;
+    private eliminateDisconnectedPlayer;
+    private resolvePendingPhasesAfterElimination;
     getAvailableActions(playerId: string): Action[];
     destroy(): void;
 }
