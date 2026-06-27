@@ -2,11 +2,11 @@
   "name": "coup-server",
   "version": "1.0.0",
   "description": "Coup multiplayer card game server",
-  "main": "dist/server.js",
+  "main": "dist/server/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
+    "build": "tsc -b",
+    "start": "node dist/server/src/server.js",
     "test": "echo \"Tests coming soon\""
   },
   "dependencies": {

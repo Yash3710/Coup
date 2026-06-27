@@ -815,6 +815,7 @@ class GameEngine {
             gameLog: this.state.gameLog,
             winner: this.state.winner,
             turnTimerEnd: this.state.turnTimerEnd,
+            startedAt: this.state.startedAt,
             myPlayerId: playerId,
         };
     }
@@ -838,6 +839,7 @@ class GameEngine {
             gameLog: this.state.gameLog,
             winner: this.state.winner,
             turnTimerEnd: this.state.turnTimerEnd,
+            startedAt: this.state.startedAt,
             myPlayerId: '__spectator__',
         };
     }

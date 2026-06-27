@@ -125,6 +125,7 @@ export interface GameStateView {
     gameLog: GameLogEntry[];
     winner: string | null;
     turnTimerEnd: number | null;
+    startedAt: number;
     myPlayerId: string;
 }
 export interface PendingAction {
