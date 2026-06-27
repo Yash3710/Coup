@@ -122,6 +122,11 @@ export class RoomManager {
       return { success: false, error: 'Already in this room.' };
     }
 
+    // Check if avatar is already taken by another human player
+    if (room.players.some((p) => !p.isBot && p.avatarUrl === avatarUrl)) {
+      return { success: false, error: 'That avatar is already taken by someone in this room.' };
+    }
+
     const playerView: PlayerView = {
       id: playerId,
       name,

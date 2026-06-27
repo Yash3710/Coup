@@ -28,7 +28,7 @@ class SocketService {
   connect() {
     if (this.socket?.connected) return;
 
-    const serverUrl = import.meta.env.VITE_SERVER_URL || window.location.origin;
+    const serverUrl = 'https://coup-backend-lywm.onrender.com';
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,

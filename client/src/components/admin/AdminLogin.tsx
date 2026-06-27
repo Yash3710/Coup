@@ -17,7 +17,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const res = await fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/admin/login', {
+      const res = await fetch('https://coup-backend-lywm.onrender.com' + '/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
