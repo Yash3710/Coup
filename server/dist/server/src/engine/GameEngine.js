@@ -121,14 +121,58 @@ class GameEngine {
             return;
         this.state.turnTimerEnd = Date.now() + this.turnTimerDuration * 1000;
         this.turnTimer = setTimeout(() => {
-            // Auto-income on timeout
-            const current = this.state.players[this.state.currentPlayerIndex];
-            if (current.alive && this.state.phase === types_1.GamePhase.ActionPhase) {
-                this.addLog(`${current.name} timed out — auto Income.`, types_1.LogType.System, current.id);
-                current.coins += 1;
-                this.addLog(`${current.name} takes Income (+1 coin, total ${current.coins}).`, types_1.LogType.Action, current.id);
-                this.advanceTurn();
+            if (this.state.phase === types_1.GamePhase.ActionPhase) {
+                const current = this.state.players[this.state.currentPlayerIndex];
+                if (current.alive) {
+                    this.addLog(`${current.name} timed out — auto Income.`, types_1.LogType.System, current.id);
+                    current.coins += 1;
+                    this.addLog(`${current.name} takes Income (+1 coin, total ${current.coins}).`, types_1.LogType.Action, current.id);
+                    this.advanceTurn();
+                }
             }
+            else if (this.state.phase === types_1.GamePhase.ChallengePhase && this.state.pendingAction) {
+                const eligible = this.getEligibleChallengers(this.state.pendingAction.playerId);
+                eligible.forEach(id => {
+                    if (!this.state.pendingAction.respondedPlayers.includes(id)) {
+                        this.handlePassChallenge(id);
+                    }
+                });
+            }
+            else if (this.state.phase === types_1.GamePhase.BlockPhase && this.state.pendingAction) {
+                const eligible = this.getEligibleBlockers(this.state.pendingAction.action, this.state.pendingAction.playerId, this.state.pendingAction.targetId);
+                eligible.forEach(id => {
+                    if (!this.state.pendingAction.respondedPlayers.includes(id)) {
+                        this.handlePassBlock(id);
+                    }
+                });
+            }
+            else if (this.state.phase === types_1.GamePhase.BlockChallengePhase && this.state.pendingBlock) {
+                const eligible = this.getEligibleChallengers(this.state.pendingBlock.blockerId);
+                eligible.forEach(id => {
+                    if (!this.state.pendingBlock.respondedPlayers.includes(id)) {
+                        this.handlePassBlockChallenge(id);
+                    }
+                });
+            }
+            else if (this.state.phase === types_1.GamePhase.ResolveLoseInfluence && this.state.pendingLoseInfluence) {
+                const player = this.getPlayerById(this.state.pendingLoseInfluence.playerId);
+                if (player && player.alive) {
+                    const unrevealed = player.cards.find(c => !c.revealed);
+                    if (unrevealed) {
+                        this.handleLoseInfluence(player.id, unrevealed.id);
+                    }
+                }
+            }
+            else if (this.state.phase === types_1.GamePhase.ExchangePhase && this.state.pendingExchange) {
+                const player = this.getPlayerById(this.state.pendingExchange.playerId);
+                if (player && player.alive) {
+                    const keepCount = player.cards.filter(c => !c.revealed).length;
+                    const allCards = [...this.state.pendingExchange.playerCards, ...this.state.pendingExchange.drawnCards];
+                    const keepIds = allCards.slice(0, keepCount).map(c => c.id);
+                    this.handleExchangeChoice(player.id, keepIds);
+                }
+            }
+            this.emitStateChange();
         }, this.turnTimerDuration * 1000);
     }
     clearTurnTimer() {
@@ -237,12 +281,14 @@ class GameEngine {
         if (actionDef.canBeChallenged) {
             // Go to challenge phase first
             this.state.phase = types_1.GamePhase.ChallengePhase;
+            this.startTurnTimer();
             this.syncDeck();
             this.emitStateChange();
         }
         else if (actionDef.canBeBlocked) {
             // e.g. Foreign Aid — cannot be challenged but can be blocked
             this.state.phase = types_1.GamePhase.BlockPhase;
+            this.startTurnTimer();
             this.syncDeck();
             this.emitStateChange();
         }
@@ -287,6 +333,7 @@ class GameEngine {
                 continueAction: false, // Action cancelled
             };
             this.state.phase = types_1.GamePhase.ResolveLoseInfluence;
+            this.startTurnTimer();
             // Check if the bluffer has only 1 unrevealed card, auto-reveal
             this.autoRevealIfOneCard(pendingAction.playerId);
         }
@@ -300,6 +347,7 @@ class GameEngine {
                 originalAction: { ...pendingAction },
             };
             this.state.phase = types_1.GamePhase.ResolveLoseInfluence;
+            this.startTurnTimer();
             this.autoRevealIfOneCard(challengerId);
         }
         this.emitStateChange();
@@ -335,6 +383,7 @@ class GameEngine {
             const actionDef = types_1.ACTION_DEFINITIONS[pendingAction.action];
             if (actionDef.canBeBlocked) {
                 this.state.phase = types_1.GamePhase.BlockPhase;
+                this.startTurnTimer();
                 // Reset responded players for block phase
                 // (respondedPlayers on pendingAction is for challenge; block has its own tracking below)
             }
@@ -373,6 +422,7 @@ class GameEngine {
             respondedPlayers: [],
         };
         this.state.phase = types_1.GamePhase.BlockChallengePhase;
+        this.startTurnTimer();
         this.emitStateChange();
         return { success: true };
     }
@@ -466,6 +516,7 @@ class GameEngine {
                 },
             };
             this.state.phase = types_1.GamePhase.ResolveLoseInfluence;
+            this.startTurnTimer();
             this.autoRevealIfOneCard(pendingBlock.blockerId);
         }
         else {
@@ -477,6 +528,7 @@ class GameEngine {
                 continueAction: false, // Block succeeded, action is cancelled
             };
             this.state.phase = types_1.GamePhase.ResolveLoseInfluence;
+            this.startTurnTimer();
             this.autoRevealIfOneCard(challengerId);
         }
         this.emitStateChange();
@@ -563,6 +615,7 @@ class GameEngine {
                 }
                 else {
                     this.state.phase = types_1.GamePhase.BlockPhase;
+                    this.startTurnTimer();
                     this.emitStateChange();
                 }
             }
@@ -675,6 +728,7 @@ class GameEngine {
                         continueAction: false,
                     };
                     this.state.phase = types_1.GamePhase.ResolveLoseInfluence;
+                    this.startTurnTimer();
                     this.autoRevealIfOneCard(target.id);
                     this.emitStateChange();
                 }
@@ -693,6 +747,7 @@ class GameEngine {
                         continueAction: false,
                     };
                     this.state.phase = types_1.GamePhase.ResolveLoseInfluence;
+                    this.startTurnTimer();
                     this.autoRevealIfOneCard(target.id);
                     this.emitStateChange();
                 }
@@ -726,6 +781,7 @@ class GameEngine {
                 };
                 this.state.pendingAction = null;
                 this.state.phase = types_1.GamePhase.ExchangePhase;
+                this.startTurnTimer();
                 this.addLog(`${player.name} exchanges cards.`, types_1.LogType.Action, player.id);
                 this.emitStateChange();
                 // If it's a bot, trigger bot exchange
@@ -771,6 +827,7 @@ class GameEngine {
                         }
                         else {
                             this.state.phase = types_1.GamePhase.BlockPhase;
+                            this.startTurnTimer();
                             this.emitStateChange();
                         }
                     }
@@ -950,6 +1007,7 @@ class GameEngine {
                     }
                     else {
                         this.state.phase = types_1.GamePhase.BlockPhase;
+                        this.startTurnTimer();
                     }
                 }
                 else {
@@ -995,6 +1053,7 @@ class GameEngine {
                         }
                         else {
                             this.state.phase = types_1.GamePhase.BlockPhase;
+                            this.startTurnTimer();
                         }
                     }
                     else {
