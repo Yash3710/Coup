@@ -17,7 +17,7 @@ export const AvatarManager: React.FC<AvatarManagerProps> = ({ token }) => {
 
   const fetchAvatars = async () => {
     try {
-      const res = await fetch('/api/avatars');
+      const res = await fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/avatars');
       if (res.ok) {
         const data = await res.json();
         setAvatars(data);
@@ -45,7 +45,7 @@ export const AvatarManager: React.FC<AvatarManagerProps> = ({ token }) => {
       const formData = new FormData();
       formData.append('avatar', selectedFile);
 
-      const res = await fetch('/api/admin/upload/avatar', {
+      const res = await fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/admin/upload/avatar', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -62,7 +62,7 @@ export const AvatarManager: React.FC<AvatarManagerProps> = ({ token }) => {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/admin/avatars/${id}`, {
+      const res = await fetch((import.meta.env.VITE_SERVER_URL || '') + `/api/admin/avatars/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });

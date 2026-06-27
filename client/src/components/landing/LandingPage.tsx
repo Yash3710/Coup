@@ -21,7 +21,7 @@ export const LandingPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/avatars')
+    fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/avatars')
       .then((r) => r.ok ? r.json() : [])
       .then((data) => setUploadedAvatars(data))
       .catch(() => setUploadedAvatars([]));

@@ -22,7 +22,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({ token }) => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    fetch('/api/admin/characters', {
+    fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/admin/characters', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : null))
@@ -51,7 +51,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({ token }) => {
     setMessage('');
 
     try {
-      const res = await fetch(`/api/admin/characters/${char.character}`, {
+      const res = await fetch((import.meta.env.VITE_SERVER_URL || '') + `/api/admin/characters/${char.character}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

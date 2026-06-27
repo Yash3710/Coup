@@ -22,7 +22,7 @@ export const CardArtManager: React.FC<CardArtManagerProps> = ({ token }) => {
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
-    fetch('/api/admin/characters', {
+    fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/admin/characters', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : []))
@@ -60,7 +60,7 @@ export const CardArtManager: React.FC<CardArtManagerProps> = ({ token }) => {
       formData.append('card', file); // changed 'image' to 'card'
       formData.append('character', character);
 
-      const res = await fetch('/api/admin/upload/card', { // changed endpoint
+      const res = await fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/admin/upload/card', { // changed endpoint
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -71,7 +71,7 @@ export const CardArtManager: React.FC<CardArtManagerProps> = ({ token }) => {
         const imageUrl = data.url;
 
         // Now save this to the character config
-        await fetch('/api/admin/characters', {
+        await fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/admin/characters', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

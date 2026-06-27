@@ -13,7 +13,7 @@ import { GamesHub } from './components/hub/GamesHub';
 function App() {
   useEffect(() => {
     // Fetch dynamic character configs (including custom art)
-    fetch('/api/characters')
+    fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/characters')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {

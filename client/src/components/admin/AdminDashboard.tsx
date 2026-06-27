@@ -21,7 +21,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token }) => {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/admin/stats', {
+      const res = await fetch((import.meta.env.VITE_SERVER_URL || '') + '/api/admin/stats', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
