@@ -92,8 +92,13 @@ export const CardArtManager: React.FC<CardArtManagerProps> = ({ token }) => {
           delete next[character];
           return next;
         });
+      } else {
+        const errorData = await res.json();
+        alert('Upload failed: ' + (errorData.error || 'Unknown error'));
       }
-    } catch {}
+    } catch (error: any) {
+      alert('Upload request failed: ' + error.message);
+    }
     setUploading(null);
   };
 

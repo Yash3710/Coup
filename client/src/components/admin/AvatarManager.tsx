@@ -55,8 +55,13 @@ export const AvatarManager: React.FC<AvatarManagerProps> = ({ token }) => {
         setPreview(null);
         setSelectedFile(null);
         fetchAvatars();
+      } else {
+        const err = await res.json();
+        alert('Upload failed: ' + (err.error || 'Unknown error'));
       }
-    } catch {}
+    } catch (error: any) {
+      alert('Upload request failed: ' + error.message);
+    }
     setUploading(false);
   };
 
