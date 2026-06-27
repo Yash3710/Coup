@@ -294,6 +294,20 @@ export function createAdminRouter(roomManager: RoomManager): Router {
     res.json(stats);
   });
 
+  router.get('/rooms', verifyAdminToken, (_req: Request, res: Response) => {
+    const rooms = roomManager.getAllRoomsForAdmin();
+    res.json(rooms);
+  });
+
+  router.delete('/rooms/:id', verifyAdminToken, (req: Request, res: Response) => {
+    const success = roomManager.deleteRoomAdmin(req.params.id);
+    if (success) {
+      res.json({ message: 'Room deleted.' });
+    } else {
+      res.status(404).json({ error: 'Room not found.' });
+    }
+  });
+
   return router;
 }
 

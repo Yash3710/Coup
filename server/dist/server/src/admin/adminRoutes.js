@@ -267,6 +267,19 @@ function createAdminRouter(roomManager) {
         const stats = roomManager.getStats();
         res.json(stats);
     });
+    router.get('/rooms', verifyAdminToken, (_req, res) => {
+        const rooms = roomManager.getAllRoomsForAdmin();
+        res.json(rooms);
+    });
+    router.delete('/rooms/:id', verifyAdminToken, (req, res) => {
+        const success = roomManager.deleteRoomAdmin(req.params.id);
+        if (success) {
+            res.json({ message: 'Room deleted.' });
+        }
+        else {
+            res.status(404).json({ error: 'Room not found.' });
+        }
+    });
     return router;
 }
 // ─── Public Routes (no auth required) ────────────────────────────

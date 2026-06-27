@@ -45,7 +45,7 @@ export const WordleGame: React.FC = () => {
 
       {/* Game Area */}
       <div className="flex-1 w-full max-w-lg flex flex-col items-center justify-center">
-        <Grid guesses={guesses} currentGuess={currentGuess} targetWord={targetWord} />
+        <Grid guesses={guesses} currentGuess={currentGuess} targetWord={targetWord} errorMessage={errorMessage} />
         
         {/* Game Over Overlay */}
         {gameStatus !== 'playing' && (

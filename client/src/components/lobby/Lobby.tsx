@@ -73,24 +73,19 @@ export const Lobby: React.FC = () => {
 
   const handleQuickPlay = () => {
     if (!playerInfo) return;
-    const available = availableRooms.find(
-      (r) => !r.isPrivate && !r.gameStarted && r.playerCount < r.maxPlayers
-    );
-    if (available) {
-      handleJoin(available);
-    } else {
-      const settings: RoomSettings = {
-        maxPlayers: 4,
-        turnTimer: 30,
-        isPrivate: false,
-      };
-      socketService.quickPlayWithBots({
-        playerName: playerInfo.name,
-        avatarUrl: playerInfo.avatarUrl,
-        roomName: `${playerInfo.name}'s Bot Game`,
-        settings,
-      });
-    }
+    
+    // Always create a bot game for Quick Play
+    const settings: RoomSettings = {
+      maxPlayers: 4,
+      turnTimer: 30,
+      isPrivate: false,
+    };
+    socketService.quickPlayWithBots({
+      playerName: playerInfo.name,
+      avatarUrl: playerInfo.avatarUrl,
+      roomName: `${playerInfo.name}'s Bot Game`,
+      settings,
+    });
   };
 
   return (

@@ -495,6 +495,39 @@ export class RoomManager {
   }
 
   /**
+   * Get all rooms for admin dashboard.
+   */
+  getAllRoomsForAdmin(): any[] {
+    const all = [];
+    for (const managed of this.rooms.values()) {
+      all.push({
+        id: managed.room.id,
+        name: managed.room.name,
+        hostName: managed.room.players.find(p => p.id === managed.room.hostId)?.name || 'Unknown',
+        playerCount: managed.room.players.length,
+        maxPlayers: managed.room.maxPlayers,
+        gameStarted: managed.room.gameStarted,
+        isPrivate: managed.room.isPrivate,
+        playersOnline: managed.room.players.filter(p => p.connected && !p.isBot).length,
+      });
+    }
+    return all;
+  }
+
+  /**
+   * Delete a room (admin only).
+   */
+  deleteRoomAdmin(roomId: string): boolean {
+    const managed = this.rooms.get(roomId);
+    if (!managed) return false;
+    
+    // Clean up invite code mapping
+    this.inviteCodeMap.delete(managed.room.inviteCode);
+    this.rooms.delete(roomId);
+    return true;
+  }
+
+  /**
    * Generate a unique 6-character alphanumeric invite code.
    */
   private generateInviteCode(): string {

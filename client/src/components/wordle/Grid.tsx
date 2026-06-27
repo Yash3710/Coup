@@ -17,12 +17,20 @@ const statusColors: Record<LetterStatus, string> = {
 };
 
 const Tile: React.FC<TileProps> = ({ letter, status, animate, index }) => {
+  // animate is isSubmitted here
   return (
     <motion.div
-      initial={animate ? { rotateX: -90, opacity: 0 } : false}
-      animate={animate ? { rotateX: 0, opacity: 1 } : false}
-      transition={{ delay: index * 0.1, duration: 0.4 }}
-      className={`w-12 h-12 md:w-16 md:h-16 border-2 flex items-center justify-center text-2xl md:text-3xl font-bold uppercase ${statusColors[status]}`}
+      initial={animate ? { rotateX: 90, opacity: 0 } : { scale: letter ? 0.8 : 1 }}
+      animate={animate ? { rotateX: 0, opacity: 1 } : { scale: 1 }}
+      transition={
+        animate 
+          ? { delay: index * 0.15, duration: 0.4, type: 'spring', bounce: 0.3 }
+          : { type: 'spring', stiffness: 400, damping: 25 }
+      }
+      className={`w-12 h-12 md:w-16 md:h-16 flex items-center justify-center text-2xl md:text-3xl font-bold uppercase
+        ${status === 'empty' ? 'border-2 border-slate-600 bg-transparent text-white' : statusColors[status]}
+        ${letter && status === 'empty' ? 'border-slate-400' : ''}
+      `}
     >
       {letter}
     </motion.div>
@@ -34,9 +42,10 @@ interface RowProps {
   targetWord: string;
   isCurrent: boolean;
   isSubmitted: boolean;
+  hasError?: boolean;
 }
 
-const Row: React.FC<RowProps> = ({ guess, targetWord, isCurrent, isSubmitted }) => {
+const Row: React.FC<RowProps> = ({ guess, targetWord, isCurrent, isSubmitted, hasError }) => {
   const tiles = Array(5).fill('');
   
   // Calculate statuses for submitted rows
@@ -75,7 +84,11 @@ const Row: React.FC<RowProps> = ({ guess, targetWord, isCurrent, isSubmitted }) 
   }
 
   return (
-    <div className="flex gap-2 mb-2">
+    <motion.div 
+      className="flex gap-2 mb-2"
+      animate={hasError ? { x: [-10, 10, -10, 10, 0] } : false}
+      transition={{ duration: 0.4 }}
+    >
       {tiles.map((letter, i) => (
         <Tile 
           key={i} 
@@ -85,7 +98,7 @@ const Row: React.FC<RowProps> = ({ guess, targetWord, isCurrent, isSubmitted }) 
           index={i}
         />
       ))}
-    </div>
+    </motion.div>
   );
 };
 
@@ -93,9 +106,10 @@ interface GridProps {
   guesses: string[];
   currentGuess: string;
   targetWord: string;
+  errorMessage?: string | null;
 }
 
-export const Grid: React.FC<GridProps> = ({ guesses, currentGuess, targetWord }) => {
+export const Grid: React.FC<GridProps> = ({ guesses, currentGuess, targetWord, errorMessage }) => {
   const empties = guesses.length < 6 ? Array(5 - guesses.length).fill('') : [];
 
   return (
@@ -105,7 +119,7 @@ export const Grid: React.FC<GridProps> = ({ guesses, currentGuess, targetWord })
       ))}
       
       {guesses.length < 6 && (
-        <Row guess={currentGuess} targetWord={targetWord} isCurrent={true} isSubmitted={false} />
+        <Row guess={currentGuess} targetWord={targetWord} isCurrent={true} isSubmitted={false} hasError={!!errorMessage} />
       )}
       
       {empties.map((_, i) => (

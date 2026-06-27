@@ -45,10 +45,10 @@ export const GameBoard: React.FC = () => {
   const opponents = gameState.players.filter(p => p.id !== gameState.myPlayerId);
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans flex flex-col md:flex-row h-screen overflow-hidden">
+    <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans flex flex-col md:flex-row md:h-screen md:overflow-hidden overflow-x-hidden">
       
       {/* LEFT COLUMN: ROSTER */}
-      <div className="w-full md:w-64 lg:w-80 bg-[#1e293b] border-r border-slate-700 flex flex-col shrink-0">
+      <div className="w-full md:w-64 lg:w-80 bg-[#1e293b] md:border-r border-b md:border-b-0 border-slate-700 flex flex-col shrink-0 md:h-full max-h-[45vh] md:max-h-none">
         <div className="p-4 border-b border-slate-700 bg-[#0f172a]">
           <h2 className="font-bold text-slate-300 uppercase tracking-wider text-sm flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
@@ -90,7 +90,7 @@ export const GameBoard: React.FC = () => {
       </div>
 
       {/* CENTER COLUMN: ACTION HUB */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#0f172a]">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#0f172a] min-h-[50vh] md:min-h-0">
         
         {/* Top Banner: Status */}
         <div className="h-24 border-b border-slate-800 bg-[#1e293b]/50 flex items-center justify-center p-4">
@@ -199,7 +199,7 @@ export const GameBoard: React.FC = () => {
       </div>
 
       {/* RIGHT COLUMN: LOG & RULES */}
-      <div className="w-full md:w-80 bg-[#1e293b] border-l border-slate-700 flex flex-col shrink-0 h-64 md:h-full">
+      <div className="w-full md:w-80 bg-[#1e293b] md:border-l border-t md:border-t-0 border-slate-700 flex flex-col shrink-0 h-[50vh] md:h-full">
         <div className="flex border-b border-slate-700">
           <button
             onClick={() => setActiveRightTab('log')}

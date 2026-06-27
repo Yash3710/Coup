@@ -124,6 +124,14 @@ export declare class RoomManager {
         totalGamesPlayed: number;
     };
     /**
+     * Get all rooms for admin dashboard.
+     */
+    getAllRoomsForAdmin(): any[];
+    /**
+     * Delete a room (admin only).
+     */
+    deleteRoomAdmin(roomId: string): boolean;
+    /**
      * Generate a unique 6-character alphanumeric invite code.
      */
     private generateInviteCode;
