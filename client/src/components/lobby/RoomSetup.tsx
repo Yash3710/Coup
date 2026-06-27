@@ -26,7 +26,8 @@ export const RoomSetup: React.FC = () => {
 
   if (!currentRoom || !playerInfo) return null;
 
-  const isHost = currentRoom.hostId === playerInfo.id;
+  const localPlayer = currentRoom.players?.find(p => p.name === playerInfo.name);
+  const isHost = localPlayer ? currentRoom.hostId === localPlayer.id : false;
   const canStart = (currentRoom.players?.length ?? 0) >= 2;
 
   const handleLeave = () => {

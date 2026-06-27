@@ -87,8 +87,9 @@ class SocketService {
       store().setAvailableRooms(rooms);
     });
 
-    s.on(ServerEvent.RoomCreated, (room) => {
-      store().setRoom(room);
+    s.on(ServerEvent.RoomCreated, (payload) => {
+      // It just sends { roomId, inviteCode } which isn't a full room
+      // We will wait for RoomUpdated for the full room object
     });
 
     s.on(ServerEvent.RoomJoined, (room) => {
