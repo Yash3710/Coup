@@ -141,7 +141,7 @@ class GameEngine {
             else if (this.state.phase === types_1.GamePhase.BlockPhase && this.state.pendingAction) {
                 const eligible = this.getEligibleBlockers(this.state.pendingAction.action, this.state.pendingAction.playerId, this.state.pendingAction.targetId);
                 eligible.forEach(id => {
-                    if (!this.state.pendingAction.respondedPlayers.includes(id)) {
+                    if (!this.state.pendingAction.respondedPlayers.includes(`block_pass_${id}`)) {
                         this.handlePassBlock(id);
                     }
                 });
