@@ -45,7 +45,7 @@ export const BlockModal: React.FC<BlockModalProps> = ({ gameState }) => {
 
     if (
       pendingAction.playerId === myPlayerId ||
-      pendingAction.respondedPlayers.includes(myPlayerId)
+      pendingAction.respondedPlayers.includes(`block_pass_${myPlayerId}`)
     ) {
       return null;
     }

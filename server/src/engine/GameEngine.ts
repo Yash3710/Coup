@@ -169,26 +169,26 @@ export class GameEngine {
           this.advanceTurn();
         }
       } else if (this.state.phase === GamePhase.ChallengePhase && this.state.pendingAction) {
-        const eligible = this.getEligibleChallengers(this.state.pendingAction.playerId);
-        eligible.forEach(id => {
-          if (!this.state.pendingAction!.respondedPlayers.includes(id)) {
-            this.handlePassChallenge(id);
-          }
-        });
+        const pending = this.state.pendingAction;
+        const eligible = this.getEligibleChallengers(pending.playerId);
+        const toPass = eligible.filter(id => !pending.respondedPlayers.includes(id));
+        for (const id of toPass) {
+          this.handlePassChallenge(id);
+        }
       } else if (this.state.phase === GamePhase.BlockPhase && this.state.pendingAction) {
-        const eligible = this.getEligibleBlockers(this.state.pendingAction.action, this.state.pendingAction.playerId, this.state.pendingAction.targetId);
-        eligible.forEach(id => {
-          if (!this.state.pendingAction!.respondedPlayers.includes(`block_pass_${id}`)) {
-            this.handlePassBlock(id);
-          }
-        });
+        const pending = this.state.pendingAction;
+        const eligible = this.getEligibleBlockers(pending.action, pending.playerId, pending.targetId);
+        const toPass = eligible.filter(id => !pending.respondedPlayers.includes(`block_pass_${id}`));
+        for (const id of toPass) {
+          this.handlePassBlock(id);
+        }
       } else if (this.state.phase === GamePhase.BlockChallengePhase && this.state.pendingBlock) {
-        const eligible = this.getEligibleChallengers(this.state.pendingBlock.blockerId);
-        eligible.forEach(id => {
-          if (!this.state.pendingBlock!.respondedPlayers.includes(id)) {
-            this.handlePassBlockChallenge(id);
-          }
-        });
+        const pending = this.state.pendingBlock;
+        const eligible = this.getEligibleChallengers(pending.blockerId);
+        const toPass = eligible.filter(id => !pending.respondedPlayers.includes(id));
+        for (const id of toPass) {
+          this.handlePassBlockChallenge(id);
+        }
       } else if (this.state.phase === GamePhase.ResolveLoseInfluence && this.state.pendingLoseInfluence) {
         const player = this.getPlayerById(this.state.pendingLoseInfluence.playerId);
         if (player && player.alive) {
@@ -198,10 +198,11 @@ export class GameEngine {
           }
         }
       } else if (this.state.phase === GamePhase.ExchangePhase && this.state.pendingExchange) {
-        const player = this.getPlayerById(this.state.pendingExchange.playerId);
+        const pending = this.state.pendingExchange;
+        const player = this.getPlayerById(pending.playerId);
         if (player && player.alive) {
           const keepCount = player.cards.filter(c => !c.revealed).length;
-          const allCards = [...this.state.pendingExchange.playerCards, ...this.state.pendingExchange.drawnCards];
+          const allCards = [...pending.playerCards, ...pending.drawnCards];
           const keepIds = allCards.slice(0, keepCount).map(c => c.id);
           this.handleExchangeChoice(player.id, keepIds);
         }
